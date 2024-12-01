@@ -1,0 +1,42 @@
+-- Review: a rating and written review of a product by a user. Includes metadata for community upvotes/downvotes
+CREATE TABLE IF NOT EXISTS review(
+    user_id VARCHAR(36),
+    product_id VARCHAR(36) NOT NULL,
+
+    title TEXT DEFAULT '',
+    review TEXT DEFAULT '',
+
+    rating DECIMAL(2,1) NOT NULL,
+    upvotes INTEGER NOT NULL,
+    downvotes INTEGER DEFAULT 0,
+    `timestamp` TIMESTAMP NOT NULL,
+
+    /* 
+    setting primary key on the combination of user_id + product_id 
+    seems like a viable approach, but products can have multiple 
+    reviews by anonymous/NULL users.
+    */
+    FOREIGN KEY(product_id) REFERENCES product(id)
+);
+
+CREATE INDEX IF NOT EXISTS review_product_id ON review(product_id); -- for joining on products
+-- This index is critical to quickly find related reviews for a product
+CREATE INDEX IF NOT EXISTS review_user_id_product_id_review ON review(user_id, product_id, rating, upvotes, downvotes)
+
+CREATE TABLE IF NOT EXISTS product(
+    id VARCHAR(36) PRIMARY KEY NOT NULL,
+    title TEXT DEFAULT '',
+    title_search TEXT DEFAULT '', -- search variation for title
+    creator TEXT DEFAULT '', -- = author for books, artist for music. Use product_creator or product_tag table to handle products with multiple creators.
+    creator_search TEXT DEFAULT '', -- search variation for author/artist
+    publisher TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    category TEXT DEFAULT '',
+    subcategory TEXT DEFAULT '', -- = genre for books + music. Use product_subcategory table or product_tag table to handle multi-genre books/albums
+    release_date DATE,
+    `url` TEXT
+);
+
+CREATE INDEX IF NOT EXISTS product_category_id ON product(category, id);
+CREATE INDEX IF NOT EXISTS product_title_search ON product(title_search); -- for product search by title
+CREATE INDEX IF NOT EXISTS product_creator_search ON product(creator_search); -- for product search by author/artist

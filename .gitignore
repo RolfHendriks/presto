@@ -1,0 +1,6 @@
+# raw data
+presto/data/products.sql
+presto/data/raw/*
+
+# python internals
+*__pycache__/
