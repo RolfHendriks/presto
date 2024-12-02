@@ -5,7 +5,16 @@ import numbers
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib.artist import Artist
+from matplotlib.text import Text
+from matplotlib.axes import Axes
+import matplotlib.patheffects as path_effects
+
 import pandas as pd
+
+############
+# Utils
+###########
 
 # unable to import this from format.py. Why?
 def to_percent(rate) -> str:
@@ -31,6 +40,75 @@ def to_percent(rate) -> str:
     # single-digit percentages: output one decimal
     return f'{pct:.1f}%'
 
+# Add outline to text (or any other element)
+def add_outline(artist: mpl.artist.Artist, color = 'k', linewidth = 1):
+    artist.set_path_effects([
+        path_effects.Stroke(linewidth=linewidth, foreground=color),
+        path_effects.Normal()
+    ])
+
+def plot_rates(
+    y, width,
+    colors = None,
+    label_inside_bar_cutoff = 0.75,
+    barheight = 0.9, bgbarheight = 0.8, bgbarcolor = ('k', 0.05),
+    labeloffset = 8, labelfontsize = 13, 
+    ax: Axes = None
+):
+    """
+    Given a list of rates from 0-1, outputs a custom bar graph optimized for displaying percentages.
+    """
+    ax = ax or plt.gca()
+    ticks = [0, 20, 40, 60, 80, 100]
+    percents = [x * 100 for x in width]
+    bars = ax.barh(y, percents, height = barheight, edgecolor = 'k', linewidth = 0.5, color = colors)
+    bgbars = ax.barh(y, [100 - x - 1 for x in percents], left = percents, edgecolor = 'k', linewidth = 0.5, height = bgbarheight, color = bgbarcolor)
+    texts = []
+    for pct, bar in zip(percents, bars):
+        y = bar.get_center()[1]
+        inside_bar = pct/100 > label_inside_bar_cutoff
+        alignment = 'right' if inside_bar else 'left'
+        x = pct
+        xoffset = -labeloffset if inside_bar else labeloffset
+        txt = ax.annotate(
+            f'{round(pct)}%', xy = (x, y), 
+            xytext = (xoffset, 0), textcoords = 'offset points', 
+            verticalalignment = 'center', horizontalalignment = alignment, 
+            fontweight = 'bold' if inside_bar else 'medium', fontsize = labelfontsize,
+            color = 'w' if inside_bar else 'k'
+        )
+        if inside_bar:
+            add_outline(txt)
+        texts.append(txt)
+    ax.set(
+        xlim = (0, 100),
+        xticks = ticks, xticklabels = map(lambda x: f'{int(x)}%', ticks)
+    )
+    ax.spines['left'].set_visible(False)
+    ax.yaxis.set_tick_params(left = False)
+    return (bars, bgbars, texts)
+
+# Artist hierarchy inspection.
+# Use these for detailed insights into matplotlib layout
+def inspect_layout(artist: Artist, handler = lambda artist, depth, index: None, depth = 0, index = 0):
+    handler(artist, depth, index)
+    for index, child in enumerate(artist.get_children()):
+        inspect_layout(child, handler, depth = depth + 1, index = index)
+
+def print_layout(artist: Artist): # to do: add maximum depth or filters as needed to curb verbose output
+    def handle_artist(artist, depth, index):
+        print('| ' * depth + f'{index+1}. ' + str(artist))
+    inspect_layout(artist, handle_artist)
+
+def show_layout(artist: mpl.artist.Artist, facecolor = ('y', 0.05), depth = 0):
+    def handle_artist(artist, depth, index):
+        if hasattr(artist, 'set_facecolor'):
+            if not artist.get_facecolor():
+                artist.set_facecolor(facecolor)
+        elif isinstance(artist, Text):
+            artist.set_bbox({ 'facecolor': facecolor})
+    inspect_layout(artist, handle_artist)
+
 def set_style():
     """
     Configure default matplotlib styling used throughout the project.
@@ -39,7 +117,7 @@ def set_style():
     plt.rcParams['axes.spines.right'] = False
     plt.rcParams['savefig.transparent'] = True
     plt.rcParams['savefig.pad_inches'] = 0.1
-    plt.rcParams['figure.constrained_layout.use'] = True
+    #plt.rcParams['figure.constrained_layout.use'] = True
     #plt.rcParams['figure.dpi'] = 100
     #plt.rcParams['figure.figsize'] = [6.4, 4.8]
     #plt.rcParams['axes.grid'] = False
@@ -90,7 +168,10 @@ def rating_to_stars_string(rating) -> str:
     # to do: handle fractional stars (another dataset has them, and they can be the result of aggregates)
     return '★' * full_stars
 
-def plot_ratings(ratings: pd.Series):
+def plot_ratings(
+    ratings: pd.Series,
+    include_title = True
+):
     #counts = ratings.value_counts().sort_index(ascending = True)
     counts = ratings.value_counts(normalize = True).sort_index(ascending = True)
     for i in range(1,6):
@@ -123,15 +204,18 @@ def plot_ratings(ratings: pd.Series):
         )
     ax = plt.gca()
     ax.set(
-        title = f'({ratings_str})',
         yticks = y, yticklabels = map(rating_to_stars_string, y),
-        xticks = []
+        xticks = [], 
+        xlim = [0, max_pct]
     )
+    if include_title:
+        ax.set_title(f'({ratings_str})')
     ax.yaxis.set_tick_params(left = False)
     ax.spines['left'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.margins(0.2, 0)
-    plt.suptitle(f'        {stars_str}', fontsize = 21)
+    if include_title:
+        plt.suptitle(f'        {stars_str}', fontsize = 21)
 
     # enable to debug inspect layout
     #ax.set_facecolor(('k', 0.1))

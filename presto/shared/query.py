@@ -18,6 +18,8 @@ def query(q: str, conn: sql.Connection, params = None, verbosity = query_verbosi
     """
     Utility to execute an SQL query with optional automatic logging and performance profiling
     """
+    if verbosity > 1:
+        print(f'QUERY: {q}')
     query_description = query_description or q
     t = time.perf_counter()
     results = pd.read_sql_query(q, conn, params = params)
@@ -134,12 +136,9 @@ def get_reviews(
     """
     product_ids = [product_id_or_products] if isinstance(product_id_or_products, str) else product_id_or_products
     values = ','.join('?' * len(product_ids))
-    params = product_ids
     q = f"SELECT {fields} FROM review WHERE product_id IN ({values})"
     if drop_null_reviewers:
         q += " AND user_id IS NOT NULL;"
-    print(q)
-    print(params)
     return query(q, conn, params = product_ids, query_description = 'get_reviews', verbosity = verbosity)
 
 def _filter_unhlepful_reviews(reviews: pd.DataFrame) -> pd.DataFrame:
@@ -262,7 +261,6 @@ def get_recommendations_from_reviews(
         recommendations = recommendations[:limit]
     recommendations = recommendations.drop(columns = ['title_search', 'creator_search'])
     profile('Added product details')
-
     return recommendations
 
 def get_recommendations(
@@ -279,7 +277,7 @@ def get_recommendations(
     reviewer_max_pool_size = 100, # maximum number of reviewers to use for recommendations. Reducing this size improves performance and relevance by focusing on users with many reviews.
 
     product_max_pool_size = 1_000, # maximum number of products to consider for recommendations
-    missing_rating_value = 0,   # the value to fill in for missing ratings
+    missing_rating_value = 0,   # the value to fill in for rating when a user has not rated a product
     limit = 100,    # maximum number of recommendations
 
     # misc settings
@@ -301,11 +299,12 @@ def get_recommendations(
     # fetch matching products (no reviews yet)
     products = find_products(
         category = category, 
-        search_term = search_term, search_field = 'title', exact_match = exact_match,
+        search_term = search_term, search_field = search_field, exact_match = exact_match,
         remove_duplicates = remove_duplicates,
         conn = conn, 
         verbosity = verbosity
-    ).set_index('id')
+    )
+    #.set_index('id')
     profile(f'Found {len(products)} products')
 
     # handle product results (none, exact match, multiple matches)
@@ -316,7 +315,7 @@ def get_recommendations(
     reviews = None
     recommendations = None
     if product is not None:
-        product_ids = product.name if search_field == 'title' else products.index
+        product_ids = product.id if search_field == 'title' else products.id
         #product_ids = product.id
         reviews = get_reviews(product_ids, conn, verbosity = 0)
         profile(f'Got {len(reviews)} reviews')

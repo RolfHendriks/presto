@@ -1,0 +1,9 @@
+logo-prompt
+
+DALL·E 2024-12-01 13.42.13:
+
+Input:
+Clip art. Two upward swooshes converge into an arrow. Simple. Conveys speed and elegance. White background. Flat colors.
+
+Output:
+A simple and elegant clip art design featuring two upward swooshes converging into a single arrow, symbolizing speed and progress. The design uses fla
