@@ -261,7 +261,9 @@ def get_recommendations_from_reviews(
         recommendations = recommendations[:limit]
     recommendations = recommendations.drop(columns = ['title_search', 'creator_search'])
     profile('Added product details')
-    return recommendations
+    # The input product is always giong to be the #1 recommendation with a perfect match.
+    # This is not a meaningful result though. Let's eliminate it
+    return recommendations[1:]
 
 def get_recommendations(
     category: str,
@@ -283,7 +285,7 @@ def get_recommendations(
     # misc settings
     verbosity = query_verbosity, t = None,
     remove_duplicates = True
-) -> pd.DataFrame:
+) -> dict:
     """
     All-in-one user-facing recommendation algorithm inputting search criteria and outputting various product details and recommendations.
 
@@ -315,8 +317,8 @@ def get_recommendations(
     reviews = None
     recommendations = None
     if product is not None:
-        product_ids = product.id if search_field == 'title' else products.id
-        #product_ids = product.id
+        #product_ids = product.id if search_field == 'title' else products.id
+        product_ids = product.id
         reviews = get_reviews(product_ids, conn, verbosity = 0)
         profile(f'Got {len(reviews)} reviews')
         if filter_unhelpful_reviews:

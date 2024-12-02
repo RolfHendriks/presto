@@ -97,7 +97,10 @@ def inspect_layout(artist: Artist, handler = lambda artist, depth, index: None, 
 
 def print_layout(artist: Artist): # to do: add maximum depth or filters as needed to curb verbose output
     def handle_artist(artist, depth, index):
-        print('| ' * depth + f'{index+1}. ' + str(artist))
+        artist_description = str(artist)
+        if hasattr(artist, 'get_bbox'):
+            artist_description += f': {artist.get_bbox()}'
+        print('| ' * depth + f'{index+1}. ' + artist_description)
     inspect_layout(artist, handle_artist)
 
 def show_layout(artist: mpl.artist.Artist, facecolor = ('y', 0.05), depth = 0):
