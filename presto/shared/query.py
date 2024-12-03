@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import unidecode
@@ -11,6 +12,9 @@ import shared.reviews as rev
 # Utilities
 #################
 def connect(db = 'data/products.sql') -> sql.Connection:
+    if not os.path.exists(db):
+        curdir = os.path.abspath(os.curdir)
+        print(f"Path {db} does not exist in {curdir}")
     return sql.connect(db)
 
 query_verbosity = 1
