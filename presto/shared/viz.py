@@ -49,7 +49,7 @@ def add_outline(artist: mpl.artist.Artist, color = 'k', linewidth = 1):
 
 def plot_rates(
     y, width,
-    colors = None,
+    color = None, edgecolor = 'k',
     label_inside_bar_cutoff = 0.75,
     barheight = 0.9, bgbarheight = 0.8, bgbarcolor = ('k', 0.05),
     labeloffset = 8, labelfontsize = 13, 
@@ -61,8 +61,8 @@ def plot_rates(
     ax = ax or plt.gca()
     ticks = [0, 20, 40, 60, 80, 100]
     percents = [x * 100 for x in width]
-    bars = ax.barh(y, percents, height = barheight, edgecolor = 'k', linewidth = 0.5, color = colors)
-    bgbars = ax.barh(y, [100 - x - 1 for x in percents], left = percents, edgecolor = 'k', linewidth = 0.5, height = bgbarheight, color = bgbarcolor)
+    bars = ax.barh(y, percents, height = barheight, edgecolor = edgecolor, linewidth = 0.5, color = color)
+    bgbars = ax.barh(y, [100 - x - 1 for x in percents], left = percents, edgecolor = edgecolor, linewidth = 0.5, height = bgbarheight, color = bgbarcolor)
     texts = []
     for pct, bar in zip(percents, bars):
         y = bar.get_center()[1]
@@ -84,7 +84,8 @@ def plot_rates(
         xlim = (0, 100),
         xticks = ticks, xticklabels = map(lambda x: f'{int(x)}%', ticks)
     )
-    ax.spines['left'].set_visible(False)
+    for spine in ['left', 'right', 'top']:
+        ax.spines[spine].set_visible(False)
     ax.yaxis.set_tick_params(left = False)
     return (bars, bgbars, texts)
 
@@ -173,7 +174,9 @@ def rating_to_stars_string(rating) -> str:
 
 def plot_ratings(
     ratings: pd.Series,
-    include_title = True
+    include_title = True,
+    style = 'percent', # options: 'percent' or 'bars'. Percent styling adds a gray backgground bar to each star rating that reaches to 100%, reusing our rate widget.
+    color = None,
 ):
     #counts = ratings.value_counts().sort_index(ascending = True)
     counts = ratings.value_counts(normalize = True).sort_index(ascending = True)
@@ -188,34 +191,39 @@ def plot_ratings(
     average_rating = weighted_ratings.sum()
     stars_str = f'{average_rating:.1f} ★'
     ratings_str = f'{count} Ratings'
-    bars = barh(
-        y, x
-    )
-    max_pct = x.max()
-    for bar, pct, _y in zip(bars, x, y):
-        label_inside_bar = False
-        offset = -4 if label_inside_bar else 4
-        text = plt.annotate(
-            to_percent(pct),
-            xy = (pct, _y),
-            xytext = (offset, 0), textcoords = 'offset points',
-            verticalalignment = 'center',
-            horizontalalignment = 'right' if label_inside_bar else 'left',
-            fontsize = 13,
-            fontweight = 'bold' if label_inside_bar else 'medium',
-            color = 'w' if label_inside_bar else 'k'
+
+    if style == 'percent':
+        plot_rates(y, x, color = color)
+        max_pct = 100
+    else:
+        bars = barh(
+            y, x, color = color
         )
+        max_pct = x.max()
+        for bar, pct, _y in zip(bars, x, y):
+            offset = 4
+            text = plt.annotate(
+                to_percent(pct),
+                xy = (pct, _y),
+                xytext = (offset, 0), textcoords = 'offset points',
+                verticalalignment = 'center',
+                horizontalalignment = 'left',
+                fontsize = 13,
+                fontweight = 'medium',
+                color = 'k'
+            )
     ax = plt.gca()
     ax.set(
         yticks = y, yticklabels = map(rating_to_stars_string, y),
         xticks = [], 
         xlim = [0, max_pct]
     )
+    ax.yaxis.set_tick_params(labelsize = 15)
     if include_title:
         ax.set_title(f'({ratings_str})')
     ax.yaxis.set_tick_params(left = False)
-    ax.spines['left'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
+    for spine in ['top', 'bottom', 'left', 'right']:
+        ax.spines[spine].set_visible(False)
     ax.margins(0.2, 0)
     if include_title:
         plt.suptitle(f'        {stars_str}', fontsize = 21)
