@@ -17,6 +17,8 @@ def describe_number(number) -> str:
         return number
     if number >= 1_000_000:
         return f'{number/1_000_000:.1f}M'
+    if number >= 10_000:
+        return f'{round(number/1_000)}K'
     if number >= 1_000:
         return f'{number/1_000:.1f}K'
     if number < 0.1:

@@ -120,7 +120,8 @@ def set_style():
     plt.rcParams['axes.spines.top'] = False
     plt.rcParams['axes.spines.right'] = False
     plt.rcParams['savefig.transparent'] = True
-    plt.rcParams['savefig.pad_inches'] = 0.1
+    plt.rcParams['savefig.dpi'] = 300
+    #plt.rcParams['savefig.pad_inches'] = 0.1
     #plt.rcParams['figure.constrained_layout.use'] = True
     #plt.rcParams['figure.dpi'] = 100
     #plt.rcParams['figure.figsize'] = [6.4, 4.8]
