@@ -117,13 +117,16 @@ def get_product_details(product_ids, conn: sql.Connection, select = '*', verbosi
     """
     Given a list of up to 250,000 product IDs, return product details for each product.
     """
-    return get_records_by_ids(
+    result = get_records_by_ids(
         product_ids, 
         'product', 
         conn, 
         select = select, 
         verbosity= verbosity, query_description = f'product details {len(product_ids)}'
-    ).set_index('id')
+    )
+    if 'id' in result.columns:
+        result.set_index('id', inplace = True)
+    return result
 
 ############
 # Reviews
@@ -170,7 +173,6 @@ def get_related_reviews(
     if filter_unhelpful_reviews:
         reviews = _filter_unhlepful_reviews(reviews)
     user_ids = reviews.user_id.dropna().unique()
-    # to do: eclude NULL user id
     related_reviews = get_records_by_ids(
         user_ids, 
         table = 'review', id_column = 'user_id', select = 'user_id, product_id, rating, upvotes, downvotes', 
@@ -228,11 +230,6 @@ def get_recommendations_from_reviews(
             print(f"{elapsed:.3}: {message}")
     user_count = len(reviews.user_id.unique())
     product_count = len(reviews.product_id.unique())
-    data_points = user_count * product_count
-    if data_points >= 1_000_000_000:
-        print(f"WARNING: recommendations require {data_points} data points because the data contain {product_count} products x {user_count} users")
-        if data_points >= 10_000_000_000:
-            raise ValueError(f"User review dataset too large ({product_count} x {user_count})")
     
     # crunch the numbers to find similar products using cosine similarity
     user_ratings_per_product = pd.pivot(reviews, values = 'rating', index = 'product_id', columns = 'user_id')
@@ -265,9 +262,7 @@ def get_recommendations_from_reviews(
         recommendations = recommendations[:limit]
     recommendations = recommendations.drop(columns = ['title_search', 'creator_search'])
     profile('Added product details')
-    # The input product is always giong to be the #1 recommendation with a perfect match.
-    # This is not a meaningful result though. Let's eliminate it
-    return recommendations[1:]
+    return recommendations
 
 def get_recommendations(
     category: str,
