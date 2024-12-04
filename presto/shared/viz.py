@@ -53,6 +53,7 @@ def plot_rates(
     label_inside_bar_cutoff = 0.75,
     barheight = 0.9, bgbarheight = 0.8, bgbarcolor = ('k', 0.05),
     labeloffset = 8, labelfontsize = 13, 
+    show_x_axis = True,
     ax: Axes = None
 ):
     """
@@ -84,6 +85,9 @@ def plot_rates(
         xlim = (0, 100),
         xticks = ticks, xticklabels = map(lambda x: f'{int(x)}%', ticks)
     )
+    if not show_x_axis:
+        ax.xaxis.set_visible(False)
+        ax.spines['bottom'].set_visible(False)
     for spine in ['left', 'right', 'top']:
         ax.spines[spine].set_visible(False)
     ax.yaxis.set_tick_params(left = False)
