@@ -1,29 +1,75 @@
 # Presto
-A high-performance product recommendation system handling millions of reviews within milliseconds.
+A high-performance book and music recommendation system handling millions of reviews within milliseconds.
 
 ## Overview
-Presto is a product recommendation algorithm centered around user reviews, behaving similarly to a ‘users who liked this also liked’ section on an e-commerce site.
+Presto is a product recommendation algorithm centered around user reviews - like a ‘users who liked this also liked’ section on an e-commerce site.
 
 Presto is built for speed, running on a high-performance SQL database of over 7 million reviews of almost a million books and albums originating from different sources. Though nominally a recommendation algorithm project, Presto is actually a project centered around SQL database architecture and performance.
 
-This project uses:
-- Jupyter Lab Python notebooks
-- Python’s [Anaconda](https://www.anaconda.com/download) ecosystem. Specifically:
-  - Pandas
-  - Matplotlib
-  - Scipy
-  - Scikit-Learn
-- sqlite
+## Key Features
+- Search through millions of reviews in milliseconds
+- Search by book title, album title, author, or artist
+- Find product recommendations based on **[cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity)** of user reviews
+- Search capabilities including:
+  - **Diacritic insensitivity** (e.g. 'Celine Dion' matches 'Céline Dion'. Important in all non-English countries)
+  - Insensitivity to filler words (e.g. 'The Hunger Games' matches 'Hunger Games')
+  - Insensitivity to name ordering (e.g. 'george orwell' matches 'Orwell, George')
+- Flexible high-performance **SQL backend** that can handle products of various types from various sources
+- Disambiguation for multiple editions of the same product
 
 ## The Algorithm
 
-Presto uses [Cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity)  to find recommendations for similar products.
+The simplest way to understand Presto! is to see it from a user's perspective. This project includes a user-facing [demo notebook](./demo.ipynb) that can input a book, album, author, or artist to search and output a matching result and recommendation:
 
-To do: fill in details
+![Presto Demo](/images/demo.png)
 
-## Datasets
+The recommendation portion of the algorithm is based on [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity) of user reviews. Cosine similarities work by first creating a table of user reviews by product, then evaluating the pairwise similarities of every two possible products based on user ratings. The final recommendations are the products whose user ratings are closest to the searched product:
 
-To do: 
+![Recommendations Explained](/images/recommendations.png)
+
+Recommendation algorithms are a remarkable and simple example of emergent intelligence. Although Presto! only looks at product ids, user ids, and ratings (it does not even know the name of the product being compared, nor anything else about it), its recommendations pick up on works:
+- by the same artist/author
+- by aliases of the same artist
+- of the same genre
+- created at a similar time
+- having a similar soundscape
+- being a direct influence on the artist
+- etc
+
+For more details about how Presto!s recommendations work, see the [Recommendations Notebook](/presto/04-recommendations.ipynb)
+
+
+## The Data
+
+Presto! stands on the shoulders of giants, and on over 7 gigabytes of product and review data pulled from different sources:
+
+![Dataset](/images/products.png)
+
+The size of Presto!s dataset was borne of the humbling realization that creating a recommendation system that can compete with mainstream algorithms like Amazon or Spotify takes enormous amounts of data - more than is publicly available in any dataset. Although Presto!s data set is large enough to handle well-known artists and authors with excellence, only a small percentage of products have enough user reviews to make high-quality recommendations. This is despite the majority of the project being spent on the dataset:
+
+![Reviews Per Product](/images/review_coverage.png)
+
+### Data Sources
+
+The fully developed product makes use of three excellent sources of data:
+
+### McAuley Labs Amazon Review Dataset
+
+https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023
+
+Used for Presto! music recommendations. McAuley Labs features by far the most extensive user review dataset seen during Presto!s research phase. The full dataset comprises over half a billion reviews from 34 categories, including but nowhere near limited to music.
+
+### Amazon Books Reviews Kaggle Dataset
+
+https://www.kaggle.com/datasets/mohamedbakhet/amazon-books-reviews
+
+Used for Presto! book recommendations. Though not quite as extensive as the McAuley Labs dataset, this dataset featured richer and more easily parsable data per book. Pulling from two different datasets also validated the idea of a flexible product backend and ingest pipeline.
+
+### MusicBrainz Database
+
+https://musicbrainz.org/doc/Development/JSON_Data_Dumps
+
+MusicBrainz is the Wikipedia of music data, featuring comprehensive up-to-date coverage of the genres, artists, albums, and songs of the world. Though Presto! product recommendations do not directly use MusicBrainz, MusicBrainz was used to help clean data ingested into the database and to research the landscape of music data.
 
 ## Project Structure
 
@@ -33,10 +79,10 @@ The demo notebook is a good starting point for exploring Presto from a user’s 
 ### numbered notebooks
 Going through the numbered notebooks in order is a good way to explore Presto’s features and inner workings in more detail. These notebooks are designed to be user-facing and visual.
 
-### presto/data
+### data folder
 The data folder contains all logic related to database management and administration. This includes:
-* The final sql database containing product and review data
-* Raw data from various data sources
+- The final sql database containing product and review data
+- Raw data from various data sources
 - Setting up the initial SQL database and defining its schema 
 - Ingest logic for batch-inserting large volumes of review and product data into SQL
 - Parsing logic to convert data from various sources into a format suitable for ingest
@@ -44,28 +90,21 @@ The data folder contains all logic related to database management and administra
 
 This project enforces a clean separation between database administration and data analysis. The data folder does not contain any logic for exploring data, and the rest of the project does not conduct any database administration.
 
-### presto/shared
+### shared folder
 This folder contains a variety of utilities to encapsulate shared logic between workflows. This includes but is not limited to:
 - Abstraction layer for product recommendations and product/review queries
 - Shared styling for data visualization (e.g. user review chart)
 - User-facing string formattting
 
-## Appendix: How Much Data Does A Production-Grade Music Recommender Need?
+## Getting Started
 
-One lesson I learned thoroughly in this project is that high-quality recommendations require vast amounts of data. How much data exactly do we need for a product-grade recommender though?
+Running Presto! requires a Python environment with:
+- numpy
+- matplotlib
+- Jupyter Labs / Python Notebooks
+- Scikit Learn
+- Spacy
 
-On the upper end, I would estimate that **it takes on the order of tens of millions of user reviews to make a high-quality music recommendation system** that handles niche tastes and can compete with mainstream recommenders like those on Amazon or Spotify. This is more than is publicly available in any dataset. The exact number of ratings/reviews depends on many factors, most notably on how obscure your desired genres/artists are. 
+This setup is most easily achieved by running an Anaconda Python installation and installing Spacy.
 
-This high-end estimation is based on a variety of data points:
-- When I stress-tested the Presto database against the most niche artists I could think of, only 30% had 10 or more reviews and 40% had no reviews at all. Meanwhile the [MusicBrainz](https://musicbrainz.org/) database boasted comprehensive coverage of every niche artist I entered.
-- **There are over 2.2 million unique music artists with published works**, according to the [MusicBrainz](https://musicbrainz.org/) database
-- The Presto dataset of 5M album reviews covers about 120,000 artists. To do: how many exactly have 10 or more reviews
-- I takes about 10 reviews make decent recommendations
-- User reviews are very unevenly distributed, so achieving 10 reviews for each product will take far more than 10 x as many reviews as products
-
-To do: low-end estimate
-
-
-## 
-
-
+Because Presto!s product database exceeds github storage limits by a wide margin, successfuly running Presto! requires extensive one-time setup to create the Presto! product database. The data/ingest folder contains notebooks with instructions on how to configure and populate a Presto! product and review database.

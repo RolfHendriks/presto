@@ -9,6 +9,7 @@ from matplotlib.artist import Artist
 from matplotlib.text import Text
 from matplotlib.axes import Axes
 import matplotlib.patheffects as path_effects
+import numpy as np
 
 import pandas as pd
 
@@ -61,9 +62,9 @@ def plot_rates(
     """
     ax = ax or plt.gca()
     ticks = [0, 20, 40, 60, 80, 100]
-    percents = [x * 100 for x in width]
-    bars = ax.barh(y, percents, height = barheight, edgecolor = edgecolor, linewidth = 0.5, color = color)
-    bgbars = ax.barh(y, [100 - x - 1 for x in percents], left = percents, edgecolor = edgecolor, linewidth = 0.5, height = bgbarheight, color = bgbarcolor)
+    percents = np.array([x * 100 for x in width])
+    bars = ax.barh(y, percents, height = barheight, left = 1, edgecolor = edgecolor, linewidth = 0.5, color = color)
+    bgbars = ax.barh(y, [100 - x - 2 for x in percents], left = percents + 1, edgecolor = edgecolor, linewidth = 0.5, height = bgbarheight, color = bgbarcolor)
     texts = []
     for pct, bar in zip(percents, bars):
         y = bar.get_center()[1]
@@ -103,8 +104,8 @@ def inspect_layout(artist: Artist, handler = lambda artist, depth, index: None, 
 def print_layout(artist: Artist): # to do: add maximum depth or filters as needed to curb verbose output
     def handle_artist(artist, depth, index):
         artist_description = str(artist)
-        if hasattr(artist, 'get_bbox'):
-            artist_description += f': {artist.get_bbox()}'
+        #if hasattr(artist, 'get_bbox'):
+        #    artist_description += f': {artist.get_bbox()}'
         print('| ' * depth + f'{index+1}. ' + artist_description)
     inspect_layout(artist, handle_artist)
 
@@ -121,19 +122,40 @@ def set_style():
     """
     Configure default matplotlib styling used throughout the project.
     """
+    # General settings
+    #plt.rcParams['font.family'] = 'Arial' # does not support rating stars
+    plt.rcParams['font.size'] = 13
+    plt.rcParams['font.weight'] = 'regular'
+    plt.rcParams['font.stretch'] = 'normal'     # normal | (semi|extra|ultra)?condensed | (semi|extra|ultra)?expanded
+    #plt.rcParams['savefig.transparent'] = True
+    plt.rcParams['savefig.dpi'] = 300
+
+    # Component-specific settings
     plt.rcParams['axes.spines.top'] = False
     plt.rcParams['axes.spines.right'] = False
-    plt.rcParams['savefig.transparent'] = True
-    plt.rcParams['savefig.dpi'] = 300
     #plt.rcParams['savefig.pad_inches'] = 0.1
     #plt.rcParams['figure.constrained_layout.use'] = True
     #plt.rcParams['figure.dpi'] = 100
+    plt.rcParams['figure.facecolor'] = ('b', 5/255) # Add a slight hint of color for branding and for layout transparency
     #plt.rcParams['figure.figsize'] = [6.4, 4.8]
+    plt.rcParams['figure.titlesize'] = 25
+    plt.rcParams['figure.titleweight'] = 'bold'
     #plt.rcParams['axes.grid'] = False
+    #plt.rcParams['axes.labelpad'] = 4.0
+    #plt.rcParams['axes.labelsize'] = 'medium'
+    #plt.rcParams['axes.labelweight'] = 'normal'
+    #plt.rcParams['axes.linewidth'] = 0.8
+    #plt.rcParams['axes.titlecolor'] = 'auto'
+    #plt.rcParams['axes.titlelocation'] = 'left'
+    #plt.rcParams['axes.titlepad'] = 6.0
+    #plt.rcParams['axes.titlesize'] = 21
+    #plt.rcParams['axes.titleweight'] = 'normal'
+    #plt.rcParams['axes.titley'] = None
     #plt.rcParams['grid.color'] = '#b0b0b0'
     #plt.rcParams['grid.alpha'] = 1.0
     #plt.rcParams['grid.linestyle'] = '-'
     #plt.rcParams['grid.linewidth'] = 0.8
+    plt.rcParams['svg.fonttype'] = 'none' # path | none. set to None to use true text in SVG instead of rasterizing text
 
 def barh(
     # data
@@ -179,16 +201,24 @@ def rating_to_stars_string(rating) -> str:
 
 def plot_ratings(
     ratings: pd.Series,
-    include_title = True,
     style = 'percent', # options: 'percent' or 'bars'. Percent styling adds a gray backgground bar to each star rating that reaches to 100%, reusing our rate widget.
     color = None,
+
+    rating_label_size = 15,
+    percent_label_size = 13,
+
+    include_title = True,
+    title_size = 21,
+    title_y = 1.1,
+    subtitle_size = 12,
+    subtitle_pad = 15
 ):
-    #counts = ratings.value_counts().sort_index(ascending = True)
+    # get counts per rating
     counts = ratings.value_counts(normalize = True).sort_index(ascending = True)
     for i in range(1,6):
+        # insert missing zero counts so that they are spelled out in the final plot
         if float(i) not in counts.index:
             counts[i] = 0
-    #print(counts)
     count = len(ratings)
     y = counts.index.values
     x = counts.values
@@ -213,7 +243,7 @@ def plot_ratings(
                 xytext = (offset, 0), textcoords = 'offset points',
                 verticalalignment = 'center',
                 horizontalalignment = 'left',
-                fontsize = 13,
+                fontsize = percent_label_size,
                 fontweight = 'medium',
                 color = 'k'
             )
@@ -221,17 +251,20 @@ def plot_ratings(
     ax.set(
         yticks = y, yticklabels = map(rating_to_stars_string, y),
         xticks = [], 
-        xlim = [0, max_pct]
+        xlim = [0, max_pct * 1.01] # use slight upscale on x axis to prevent clipping 
     )
-    ax.yaxis.set_tick_params(labelsize = 15)
+    ax.yaxis.set_tick_params(labelsize = rating_label_size)
     if include_title:
-        ax.set_title(f'({ratings_str})')
+        ax.set_title(f'({ratings_str})', fontsize = subtitle_size, pad = subtitle_pad)
     ax.yaxis.set_tick_params(left = False)
     for spine in ['top', 'bottom', 'left', 'right']:
         ax.spines[spine].set_visible(False)
     ax.margins(0.2, 0)
     if include_title:
-        plt.suptitle(f'        {stars_str}', fontsize = 21)
+        fig = ax.figure
+        fig.subplots_adjust(left = 0.1, right = 0.9) # make figure symmetrical so that suptitle will center-align
+        txt = plt.suptitle(f'{stars_str}', fontsize = title_size, y = title_y)
+        #txt.set_fontsize(title_size)
 
     # enable to debug inspect layout
     #ax.set_facecolor(('k', 0.1))
