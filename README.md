@@ -2,7 +2,7 @@
 A high-performance book and music recommendation system handling millions of reviews within milliseconds.
 
 ## Overview
-Presto is a product recommendation algorithm centered around user reviews - like a ‘users who liked this also liked’ section on an e-commerce site.
+Presto is a product recommendation algorithm centered around user reviews - like a ‘users who liked this also liked’ section on an e-commerce site. It was created as an SQL deep-dive for my final project in General Assembly's [Data Science Bootcamp](https://generalassemb.ly/students/courses/data-science-bootcamp).
 
 Presto is built for speed, running on a high-performance SQL database of over 7 million reviews of almost a million books and albums originating from different sources. Though nominally a recommendation algorithm project, Presto is actually a project centered around SQL database architecture and performance.
 
