@@ -202,6 +202,30 @@ def get_related_reviews(
 from scipy import sparse
 from sklearn.metrics import pairwise_distances
 
+def get_ratings_by_user(data: pd.DataFrame, product_column = 'product_id', user_column = 'user_id', rating_column = 'rating') -> pd.DataFrame:
+    """
+    Given a dataset that contains ratings per user, return a matrix of user reviews with products as rows and users as columns. This format can be useful for visualization and for computing pairwise similarities.
+    """
+    return pd.pivot(data, values = 'rating', index = 'product_id', columns = 'user_id')
+
+def get_pairwise_similarities(product_ratings_by_user: pd.DataFrame, fill_value = 0) -> pd.DataFrame:
+    """
+    Given a matrix of product reviews by users, return a matrix of pairwise product similarities.
+    
+    This method is central to providing recommendations. To find products most related to a searched product, 
+    check the row or column of the searched product in the resulting matrix.
+    """
+    user_ratings_per_product_sparse = sparse.csr_matrix(product_ratings_by_user.fillna(fill_value))
+    # compute pairwise cosine similarities
+    # The resulting entries represent the cosine of the angles between the user review vectors of two products.
+    # A cosine similarity of 1 represents identical products while a cosine similarity of 0 represents orthogonal / unrelated products
+    cosine_similarities = pairwise_distances(user_ratings_per_product_sparse, metric = 'cosine')
+    # cosine similarities return 0 for identical products and 1 for produts with no similarity. Let's invert the 
+    # scale for an intuitive user-facing metric.
+    product_similarities = 1 - cosine_similarities
+    product_ids = product_ratings_by_user.index.values
+    return pd.DataFrame(product_similarities, index = product_ids, columns = product_ids)
+                        
 def get_recommendations_from_reviews(
     product_id: str,
     reviews: pd.DataFrame,
@@ -232,23 +256,15 @@ def get_recommendations_from_reviews(
     product_count = len(reviews.product_id.unique())
     
     # crunch the numbers to find similar products using cosine similarity
-    user_ratings_per_product = pd.pivot(reviews, values = 'rating', index = 'product_id', columns = 'user_id')
-    profile(f'Created ratings table for {product_count} products by {user_count} users')
-    user_ratings_per_product_sparse = sparse.csr_matrix(user_ratings_per_product.fillna(fill_value))
-    # compute pairwise cosine similarities
-    # The resulting entries represent the cosine of the angles between the movie review vectors of two movies.
-    # A cosine similarity of 1 represents identical products while a cosine similarity of 0 represents orthogonal / unrelated products
-    pairwise_cosine_similarities = pairwise_distances(user_ratings_per_product_sparse, metric = 'cosine')
+    user_ratings_per_product = get_ratings_by_user(reviews)
+    pairwise_product_similarities = get_pairwise_similarities(user_ratings_per_product)
     profile('Calculated similarities')
 
-    # Format the results to user-friendly format
-    # convert to user-readable results oriented around the target movie
-    recommendations = pd.DataFrame(pairwise_cosine_similarities, index = user_ratings_per_product.index, columns = user_ratings_per_product.index)
     # recommended products sorted by most similar
-    recommendations = recommendations.loc[product_id].sort_values(ascending = True)
+    recommendations = pairwise_product_similarities.loc[product_id].sort_values(ascending = False)
     recommendations.drop(index = product_id, inplace = True) # Don't recommend the same product as the input.
-    recommendations = recommendations.map(lambda x: 1 - x) # it is more intuitive for 1 to represent similarity than 0
     recommendations.name = 'similarity'
+    
     # add product data for user-facing results. We only have product Ids.
     details = get_product_details(recommendations.index, conn, verbosity = 0)
     recommendations = pd.concat([recommendations, details], axis = 1).rename(columns = {product_id: 'score'})
@@ -289,7 +305,7 @@ def get_recommendations(
     All-in-one user-facing recommendation algorithm inputting search criteria and outputting various product details and recommendations.
 
     This method is intended to be the first method listed because it is the most central. Due to Python limitations though, it needs to be listed 
-    last because it makes use of all other methods.
+    last because Python requires us to define our utility methods before defining the methods using the utility methods.
     """
     t = t or time.perf_counter()
     def profile(message: str):
@@ -305,7 +321,6 @@ def get_recommendations(
         conn = conn, 
         verbosity = verbosity
     )
-    #.set_index('id')
     profile(f'Found {len(products)} products')
 
     # handle product results (none, exact match, multiple matches)
@@ -330,7 +345,7 @@ def get_recommendations(
         related_reviews = get_related_reviews(
             reviews, 
             conn, 
-            filter_unhelpful_reviews = filter_unhelpful_reviews,
+            filter_unhelpful_reviews = False,
             max_reviewer_count = reviewer_max_pool_size,
             verbosity = verbosity, t = t
         )

@@ -10,8 +10,8 @@ from matplotlib.text import Text
 from matplotlib.axes import Axes
 import matplotlib.patheffects as path_effects
 import numpy as np
-
 import pandas as pd
+import seaborn as sns
 
 ############
 # Utils
@@ -136,7 +136,7 @@ def set_style():
     #plt.rcParams['savefig.pad_inches'] = 0.1
     #plt.rcParams['figure.constrained_layout.use'] = True
     #plt.rcParams['figure.dpi'] = 100
-    plt.rcParams['figure.facecolor'] = ('b', 5/255) # Add a slight hint of color for branding and for layout transparency
+    #plt.rcParams['figure.facecolor'] = ('b', 5/255) # Add a slight hint of color for branding and for layout transparency
     #plt.rcParams['figure.figsize'] = [6.4, 4.8]
     plt.rcParams['figure.titlesize'] = 25
     plt.rcParams['figure.titleweight'] = 'bold'
@@ -193,7 +193,9 @@ def barh(
             )
     return bars
 
+##############
 # RATINGS
+##############
 def rating_to_stars_string(rating) -> str:
     full_stars = math.floor(rating)
     # to do: handle fractional stars (another dataset has them, and they can be the result of aggregates)
@@ -269,3 +271,122 @@ def plot_ratings(
     # enable to debug inspect layout
     #ax.set_facecolor(('k', 0.1))
     #ax.figure.set_facecolor(('k', 0.1))
+
+
+#########################
+# User Review Matrices
+# For showing product similarities based on user reviews
+#########################
+
+title_font_size = 15
+subtitle_font_size = 12
+colorbar_font_size = 15
+axis_font_size = 13
+subtitle_color = ('k', 0.66)
+
+def highlight_active_product(axis, data, product_id):
+    labels = axis.get_ticklabels()
+    product_idx = list(data.index).index(product_id)
+    #product_idx = labels.index(product_id)
+    if product_idx != None:
+        target_label = labels[product_idx]
+        target_label.set_fontweight('bold')
+
+def add_title_and_subtitle(ax, title, subtitle):
+    title_text = ax.set_title(title, fontsize = title_font_size, loc = 'left', pad = 32)
+    #subtitle_text = ax.text(0, 1, subtitle, fontsize = subtitle_font_size, color = subtitle_color)
+    subtitle_text = ax.annotate(
+        subtitle, 
+        xy = (0,1), xycoords = 'axes fraction', verticalalignment = 'bottom', 
+        xytext = (0, 14), textcoords = 'offset points',
+        fontsize = subtitle_font_size, color = subtitle_color
+    )
+    return title_text, subtitle_text
+
+def truncate_text(text: str, limit: int, trunc = '…') -> str:
+    if len(text) > limit:
+        return text[:limit] + trunc
+    return text
+
+def plot_user_ratings_by_product(
+        data: pd.DataFrame, 
+        target_product_id: str, # to highlight the active / target product 
+        conn, 
+        cbar_kws = None,
+        product_name_limit = 20,
+        hide_y_axis_cutoff = 50,
+        hide_x_axis_cutoff = 500
+):    
+    """
+    Given a pivot table of rows = product ids, columns = user ids, and cells = ratings, 
+    plot a heat map of product reviews by users
+    """
+    cmap = mpl.colormaps.get_cmap('Blues')
+    bounds = [-0.5, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5]
+    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+
+    # create heatmap
+    result = sns.heatmap(data, vmin = 0, vmax = 5, cmap = cmap, norm = norm, cbar_kws = cbar_kws)
+
+    # customize rating colorbar
+    colorbar = result.collections[0].colorbar
+    colorbar.set_label("Rating", fontsize = colorbar_font_size)
+    colorbar.set_ticks(range(0,6))
+    colorbar.set_ticklabels(['None', '★', '★★', '★★★', '★★★★', '★★★★★'], fontsize = 15)
+    colorbar.outline.set_visible(True)
+    colorbar.outline.set_color('k')
+    colorbar.ax.spines[:].set_visible(True)
+    result.spines[:].set_visible(True)
+
+    # customize main chart
+    product_names = data.index.map(lambda name: truncate_text(name, product_name_limit))
+    result.yaxis.set_ticklabels(product_names.values, fontsize = axis_font_size)
+    result.yaxis.label.set_visible(False)
+    plt.xlabel('User', fontsize = axis_font_size, labelpad = 12)
+    txt = result.xaxis.set_label_text('User', fontsize = axis_font_size, horizontalalignment = 'left', x = 0)
+    #txt.set_position((1, 1))
+    result.xaxis.set_ticklabels([f'U{i+1}' for i in range(len(data.columns))], fontsize = axis_font_size)
+    add_title_and_subtitle(result, 'User Ratings Per Product', 'Rows are ratings by individual users')
+    
+    highlight_active_product(result.yaxis, data, target_product_id)
+
+    if data.shape[1] >= hide_x_axis_cutoff:    
+        result.xaxis.set_visible(False)
+    if data.shape[0] >= hide_y_axis_cutoff:
+        result.yaxis.set_visible(False)
+    
+    return result
+
+#plot_user_ratings_by_product(user_ratings_per_product, product.id, conn)
+
+def plot_pairwise_similarities(data: pd.DataFrame, id: str, conn, product_name_limit = 20, ax = None, cbar_kws = None, title_fontsize = 15, cbar_fontsize = 15, axis_fontsize = 13):
+    """
+    Given a square table of pairwise product similarities, show a product similarity heatmap.
+    """
+    ax = ax or plt.gca()
+    ax = sns.heatmap(data, vmin = 0, vmax = 1, cmap = 'Reds', ax = ax, cbar_kws = cbar_kws)
+    colorbar = ax.collections[0].colorbar
+    colorbar.set_label('Product Similarity', fontsize = cbar_fontsize)
+    colorbar.set_ticks([0, .25, .5, .75, 1])
+    colorbar.set_ticklabels(['0', '25%', '50%', '75%', '100%'], fontsize = cbar_fontsize)
+    for spine in ['top', 'bottom', 'left', 'right']:
+        colorbar.ax.spines[spine].set_visible(True)
+        ax.spines[spine].set_visible(True)
+    colorbar_labels = colorbar.ax.yaxis.get_ticklabels()
+    if len(colorbar_labels) > 1:
+        colorbar_labels[0].set_verticalalignment('bottom')
+        colorbar_labels[-1].set_verticalalignment('top')
+    
+    product_names = data.index.map(lambda name: truncate_text(name, product_name_limit))
+    ax.xaxis.set_ticklabels(product_names, fontsize = axis_fontsize)
+    ax.yaxis.set_ticklabels(product_names, fontsize = axis_fontsize)
+    ax.set_title('Product Similarities', fontsize = title_fontsize, loc = 'left')
+    add_title_and_subtitle(ax, 'Product Similarities', 'Pairwise similarity of rows of product reviews')
+    ax.yaxis.label.set_visible(False)
+    ax.xaxis.label.set_visible(False)
+
+    # Highlight active product
+    highlight_active_product(ax.yaxis, data, id)
+    highlight_active_product(ax.xaxis, data, id)    
+
+    return ax
